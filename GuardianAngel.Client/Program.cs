@@ -1,7 +1,9 @@
 ﻿using GuardianAngel.Client.Properties;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -10,9 +12,12 @@ namespace GuardianAngel.Client
 {
     class Program
     {
+        static List<string> Files { get; set; } = new List<string>();
+
         [STAThread]
         static void Main(string[] args)
         {
+            PopulateFiles($@"C:\Users\{Environment.UserName}", ProcessFile);
             Initialize();
             while (true)
                 Console.Read();
@@ -23,9 +28,19 @@ namespace GuardianAngel.Client
             ShowWindow(GetConsoleWindow(), SW_HIDE);
             Console.WriteLine($"Guardian Angel Client {Assembly.GetExecutingAssembly().GetName().Version}");
             NewNotifyIcon(new Container(), new ContextMenu(new MenuItem[] { HideConsole(), ShowConsole(), Exit() }));
-            SetupFileSystemWatcher(NewFileSystemWatcher(@"C:\Users"));
+            SetupFileSystemWatcher(NewFileSystemWatcher($@"C:\Users\{Environment.UserName}"));
             Application.Run();
         }
+
+        static void PopulateFiles(string path, Action<string> action)
+        {
+            foreach (var file in Directory.GetFiles(path))
+                ProcessFile(file);
+            foreach (var dir in Directory.GetDirectories(path))
+                try { PopulateFiles(dir, action); } catch { }
+        }
+
+        static void ProcessFile(string file) => Files.Add(file);
 
         static FileSystemWatcher NewFileSystemWatcher(string path) =>
             new FileSystemWatcher(path)
@@ -42,8 +57,13 @@ namespace GuardianAngel.Client
                 Visible = true
             };
 
-        static void SetupFileSystemWatcher(FileSystemWatcher fsw) =>
-            fsw.Deleted += new FileSystemEventHandler(OnDeleted);
+        static void SetupFileSystemWatcher(FileSystemWatcher fsw)
+        {
+            fsw.Changed += new FileSystemEventHandler(OnChanged);
+            fsw.Created += new FileSystemEventHandler(OnCreated);
+            fsw.Deleted += new FileSystemEventHandler(OnDeleted); 
+            fsw.Renamed += new RenamedEventHandler(OnRenamed);
+        }
 
         static MenuItem Exit() => new MenuItem("Exit", OnExit);
         static MenuItem HideConsole() => new MenuItem("Hide Console", OnHideConsole);
@@ -51,13 +71,28 @@ namespace GuardianAngel.Client
 
         #region Event Delegates
 
+        static void OnChanged(object sender, FileSystemEventArgs args)
+        {
+            if (!args.FullPath.Contains("AppData"))
+                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+        }
+
+        static void OnCreated(object sender, FileSystemEventArgs args)
+        {
+            if (!args.FullPath.Contains("AppData"))
+                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+        }
+
         static void OnDeleted(object sender, FileSystemEventArgs args)
         {
             if (!args.FullPath.Contains("AppData"))
-            {
-                Console.WriteLine("DELETED, TIME: " + DateTime.Now);
-                Console.WriteLine("DELETED, FULLPATH: " + args.FullPath);
-            }
+                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+        }
+
+        static void OnRenamed(object sender, RenamedEventArgs args)
+        {
+            if (!args.FullPath.Contains("AppData"))
+                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
         }
 
         static void OnExit(object sender, EventArgs args)
