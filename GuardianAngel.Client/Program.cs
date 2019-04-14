@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -14,30 +13,38 @@ namespace GuardianAngel.Client
     {
         static List<string> Files { get; set; } = new List<string>();
 
+        static readonly string path = $@"C:\Users\{Environment.UserName}";
+
         [STAThread]
         static void Main(string[] args)
         {
-            PopulateFiles($@"C:\Users\{Environment.UserName}", ProcessFile);
-            Initialize();
+            PopulateFiles(path, ProcessFile);
+            Initialize(path);
             while (true)
                 Console.Read();
         }
 
-        static void Initialize()
+        static void Initialize(string path)
         {
             ShowWindow(GetConsoleWindow(), SW_HIDE);
-            Console.WriteLine($"Guardian Angel Client {Assembly.GetExecutingAssembly().GetName().Version}");
             NewNotifyIcon(new Container(), new ContextMenu(new MenuItem[] { HideConsole(), ShowConsole(), Exit() }));
-            SetupFileSystemWatcher(NewFileSystemWatcher($@"C:\Users\{Environment.UserName}"));
+            SetupFileSystemWatcher(NewFileSystemWatcher(path));
+            Console.WriteLine($"Guardian Angel Client {Assembly.GetExecutingAssembly().GetName().Version}");
             Application.Run();
         }
 
         static void PopulateFiles(string path, Action<string> action)
         {
             foreach (var file in Directory.GetFiles(path))
-                ProcessFile(file);
+            {
+                try { ProcessFile(file); }
+                catch { continue; }
+            }
             foreach (var dir in Directory.GetDirectories(path))
-                try { PopulateFiles(dir, action); } catch { }
+            {
+                try { PopulateFiles(dir, action); }
+                catch { continue; }
+            }
         }
 
         static void ProcessFile(string file) => Files.Add(file);
@@ -74,25 +81,25 @@ namespace GuardianAngel.Client
         static void OnChanged(object sender, FileSystemEventArgs args)
         {
             if (!args.FullPath.Contains("AppData"))
-                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+                Console.WriteLine($"[{DateTime.Now}] [{args.ChangeType}]\n    {args.FullPath}");
         }
 
         static void OnCreated(object sender, FileSystemEventArgs args)
         {
             if (!args.FullPath.Contains("AppData"))
-                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+                Console.WriteLine($"[{DateTime.Now}] [{args.ChangeType}]\n    {args.FullPath}");
         }
 
         static void OnDeleted(object sender, FileSystemEventArgs args)
         {
             if (!args.FullPath.Contains("AppData"))
-                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+                Console.WriteLine($"[{DateTime.Now}] [{args.ChangeType}]\n    {args.FullPath}");
         }
 
         static void OnRenamed(object sender, RenamedEventArgs args)
         {
             if (!args.FullPath.Contains("AppData"))
-                Console.WriteLine($"{DateTime.Now} {args.ChangeType}\n{args.FullPath}");
+                Console.WriteLine($"[{DateTime.Now}] [{args.ChangeType}]\n    {args.FullPath}");
         }
 
         static void OnExit(object sender, EventArgs args)
